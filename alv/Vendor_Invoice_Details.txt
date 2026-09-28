@@ -1,0 +1,97 @@
+VENDOR INVOICE DETAILS ALV
+==========================
+
+Purpose
+-------
+
+This ALV displays the invoice details for the vendor selected
+from the Vendor-wise Summary.
+
+
+How It Opens
+------------
+
+The user first opens the Vendor-wise Summary.
+
+Then the user double-clicks the Vendor ID.
+
+The program retrieves all invoices belonging to that Vendor ID
+from the YMINVOICE table.
+
+
+Data Source
+-----------
+
+Table: YMINVOICE
+
+Selection Condition
+-------------------
+
+The program retrieves invoices where:
+
+VENDOR_ID = Selected Vendor ID
+
+
+Invoice Information
+-------------------
+
+The ALV displays invoice information such as:
+
+- Invoice ID
+- Vendor ID
+- Invoice Date
+- Due Date
+- Amount
+- Paid Amount
+- Balance
+- Status
+
+
+Balance Calculation
+-------------------
+
+Balance = Amount - Paid Amount
+
+
+Status Calculation
+------------------
+
+If Balance = 0:
+
+STATUS = PAID
+
+Otherwise:
+
+STATUS = PENDING
+
+
+ALV Display
+-----------
+
+The report uses:
+
+REUSE_ALV_GRID_DISPLAY
+
+The field catalog is generated using:
+
+REUSE_ALV_FIELDCATALOG_MERGE
+
+
+Additional Behavior
+-------------------
+
+The CREATED_ON field is hidden from the displayed ALV.
+
+
+Purpose for End Users
+---------------------
+
+This ALV allows users to:
+
+1. Select a vendor from the vendor summary.
+2. Double-click the Vendor ID.
+3. View all invoices belonging to that vendor.
+4. Check invoice amounts.
+5. Check paid amounts.
+6. Check remaining balances.
+7. Check the current payment status.

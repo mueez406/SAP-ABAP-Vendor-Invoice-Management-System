@@ -1,0 +1,1228 @@
+REPORT yminvoice_m.
+
+*---------------------------------------------------------------------*
+* TABLES
+*---------------------------------------------------------------------*
+
+TABLES: ymvendor,
+        yminvoice,
+        sscrfields.
+
+*---------------------------------------------------------------------*
+* WORK AREAS
+*---------------------------------------------------------------------*
+SELECT-OPTIONS s_venid FOR ymvendor-vendor_id.
+
+
+DATA: wa_vendor  TYPE ymvendor,
+      wa_invoice TYPE yminvoice.
+
+*---------------------------------------------------------------------*
+* VENDOR ID VARIABLES
+*---------------------------------------------------------------------*
+
+DATA: lv_vendor_count TYPE i,
+      lv_new_id       TYPE ymvendor-vendor_id.
+
+*---------------------------------------------------------------------*
+* INVOICE ID VARIABLES
+*---------------------------------------------------------------------*
+
+DATA: lv_invoice_count TYPE i,
+      lv_inv_num       TYPE i,
+      lv_new_inv_id    TYPE yminvoice-invoice_id.
+
+*---------------------------------------------------------------------*
+* MAIN SCREEN - DATA ENTRY
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+SELECTION-SCREEN PUSHBUTTON 10(25) vendor
+                 USER-COMMAND vendor.
+
+SELECTION-SCREEN PUSHBUTTON 40(25) invoice
+                 USER-COMMAND invoice.
+
+SELECTION-SCREEN PUSHBUTTON 70(25) update
+                 USER-COMMAND UPDATE.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+*---------------------------------------------------------------------*
+* MAIN SCREEN - REPORTS
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+
+SELECTION-SCREEN PUSHBUTTON 03(20) pending
+                 USER-COMMAND pending.
+
+SELECTION-SCREEN PUSHBUTTON 28(20) paid
+                 USER-COMMAND paid.
+
+SELECTION-SCREEN PUSHBUTTON 53(20) summary
+                 USER-COMMAND summary.
+
+SELECTION-SCREEN PUSHBUTTON 78(20) receipt
+                 USER-COMMAND receipt.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+
+*---------------------------------------------------------------------*
+* VENDOR ENTRY SCREEN
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF SCREEN 200 AS WINDOW
+                     TITLE TEXT-003.
+
+PARAMETERS:
+  p_vid type char10,
+  p_vname TYPE char40,
+  p_city  TYPE char30,
+  p_phone TYPE ymvendor-phone_num,
+  p_email TYPE char50.
+
+SELECTION-SCREEN SKIP 1.
+
+SELECTION-SCREEN PUSHBUTTON 30(15) btn_savt
+                 USER-COMMAND savt.
+
+SELECTION-SCREEN END OF SCREEN 200.
+
+*---------------------------------------------------------------------*
+* INVOICE ENTRY SCREEN
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF SCREEN 300 AS WINDOW
+                     TITLE TEXT-004.
+
+PARAMETERS:
+  p_venid  TYPE ymvendor-vendor_id,
+
+  p_ddate  TYPE sy-datum,
+  p_amount TYPE p DECIMALS 2.
+
+SELECTION-SCREEN SKIP 1.
+
+SELECTION-SCREEN PUSHBUTTON 30(15) insave
+                 USER-COMMAND invsave.
+
+SELECTION-SCREEN END OF SCREEN 300.
+
+*---------------------------------------------------------------------*
+* PAYMENT SCREEN
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF SCREEN 400 AS WINDOW TITLE TEXT-005.
+
+  PARAMETERS: p_venpay TYPE ymvendor-vendor_id,
+              p_invid TYPE yminvoice-invoice_id,
+              p_paid TYPE p DECIMALS 2.
+
+  SELECTION-SCREEN SKIP 1.
+
+  SELECTION-SCREEN PUSHBUTTON 30(15) pay_save USER-COMMAND paysave.
+
+SELECTION-SCREEN END OF SCREEN 400.
+
+*---------------------------------------------------------------------*
+* RECEIPT SCREEN
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF SCREEN 500 AS WINDOW
+                     TITLE TEXT-006.
+
+PARAMETERS:
+  p_recinv TYPE yminvoice-invoice_id.
+
+SELECTION-SCREEN SKIP 1.
+
+SELECTION-SCREEN PUSHBUTTON 15(15) recprint
+                 USER-COMMAND recprint.
+
+SELECTION-SCREEN END OF SCREEN 500.
+
+
+*---------------------------------------------------------------------*
+* INITIALIZATION
+*---------------------------------------------------------------------*
+
+INITIALIZATION.
+
+  vendor  = 'Enter Vendor Details'.
+  invoice = 'Enter Invoice Details'.
+
+  pending = 'Pending Invoices'.
+  paid    = 'Paid Invoices'.
+  summary = 'Vendor-wise Summary'.
+  receipt = 'Receipt'.
+
+  btn_savt = 'SAVE'.
+  insave   = 'SAVE'.
+  pay_save = 'PAYSAVE'.
+  update = 'UPDATE'.
+
+  recprint = 'PRINT'.
+
+*---------------------------------------------------------------------*
+* PAYMENT F4 TYPES
+*---------------------------------------------------------------------*
+
+TYPES: BEGIN OF ty_pay_vendor,
+         vendor_id   TYPE ymvendor-vendor_id,
+         vendor_name TYPE ymvendor-vendor_name,
+       END OF ty_pay_vendor.
+
+TYPES: BEGIN OF ty_pay_invoice,
+         invoice_id TYPE yminvoice-invoice_id,
+         amount     TYPE yminvoice-amount,
+         balance    TYPE yminvoice-balance,
+       END OF ty_pay_invoice.
+
+*---------------------------------------------------------------------*
+* DATA
+*---------------------------------------------------------------------*
+
+DATA: gt_pay_vendor  TYPE TABLE OF ty_pay_vendor,
+      gt_pay_invoice TYPE TABLE OF ty_pay_invoice.
+
+*---------------------------------------------------------------------*
+* VENDOR F4 HELP FOR S_VENID
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_venid-low.
+
+  CLEAR gt_pay_vendor.
+
+  SELECT vendor_id,
+         vendor_name
+    FROM ymvendor
+    INTO TABLE @gt_pay_vendor.
+
+  IF gt_pay_vendor IS INITIAL.
+
+    MESSAGE 'No vendors found.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'VENDOR_ID'
+      dynpprog    = sy-repid
+      dynpnr      = sy-dynnr
+      dynprofield = 'P_VENPAY'
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_pay_vendor
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+  IF sy-subrc <> 0.
+
+    MESSAGE 'Vendor F4 help failed.' TYPE 'I'.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* VENDOR F4 HELP FOR P_VENID
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_venid.
+
+  CLEAR gt_pay_vendor.
+
+  SELECT vendor_id,
+         vendor_name
+    FROM ymvendor
+    INTO TABLE @gt_pay_vendor.
+
+  IF gt_pay_vendor IS INITIAL.
+
+    MESSAGE 'No vendors found.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'VENDOR_ID'
+      dynpprog    = sy-repid
+      dynpnr      = sy-dynnr
+      dynprofield = 'P_VENPAY'
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_pay_vendor
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+  IF sy-subrc <> 0.
+
+    MESSAGE 'Vendor F4 help failed.' TYPE 'I'.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* VENDOR F4 HELP FOR P_VENPAY
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_venpay.
+
+  CLEAR gt_pay_vendor.
+
+  SELECT vendor_id,
+         vendor_name
+    FROM ymvendor
+    INTO TABLE @gt_pay_vendor.
+
+  IF gt_pay_vendor IS INITIAL.
+
+    MESSAGE 'No vendors found.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+*-------------------------------------------------------------------*
+* DISPLAY VENDOR F4
+*-------------------------------------------------------------------*
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'VENDOR_ID'
+      dynpprog    = sy-repid
+      dynpnr      = sy-dynnr
+      dynprofield = 'P_VENPAY'
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_pay_vendor
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+  IF sy-subrc <> 0.
+
+    MESSAGE 'Vendor F4 help failed.' TYPE 'I'.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* INVOICE F4 HELP
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_invid.
+
+  DATA: lt_dynp TYPE TABLE OF dynpread,
+        ls_dynp TYPE dynpread.
+
+*-------------------------------------------------------------------*
+* READ VENDOR FROM CURRENT SCREEN
+*-------------------------------------------------------------------*
+
+  CLEAR: lt_dynp,
+         ls_dynp.
+
+  ls_dynp-fieldname = 'P_VENPAY'.
+
+  APPEND ls_dynp TO lt_dynp.
+
+  CALL FUNCTION 'DYNP_VALUES_READ'
+    EXPORTING
+      dyname     = sy-repid
+      dynumb     = sy-dynnr
+    TABLES
+      dynpfields = lt_dynp
+    EXCEPTIONS
+      OTHERS     = 1.
+
+  READ TABLE lt_dynp INTO ls_dynp INDEX 1.
+
+*-------------------------------------------------------------------*
+* CHECK VENDOR
+*-------------------------------------------------------------------*
+
+  IF sy-subrc <> 0
+     OR ls_dynp-fieldvalue IS INITIAL.
+
+    MESSAGE 'Please select Vendor ID first.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+*-------------------------------------------------------------------*
+* GET VENDOR ID FROM SCREEN
+*-------------------------------------------------------------------*
+
+  DATA lv_vendor_id TYPE ymvendor-vendor_id.
+
+  lv_vendor_id = ls_dynp-fieldvalue.
+
+*-------------------------------------------------------------------*
+* GET INVOICES FOR SELECTED VENDOR
+*-------------------------------------------------------------------*
+
+  CLEAR gt_pay_invoice.
+
+  SELECT invoice_id,
+         amount,
+         balance
+    FROM yminvoice
+    WHERE vendor_id = @lv_vendor_id
+    INTO TABLE @gt_pay_invoice.
+
+  IF gt_pay_invoice IS INITIAL.
+
+    MESSAGE 'No invoices found for this vendor.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+*-------------------------------------------------------------------*
+* DISPLAY INVOICE F4
+*-------------------------------------------------------------------*
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'INVOICE_ID'
+      dynpprog    = sy-repid
+      dynpnr      = sy-dynnr
+      dynprofield = 'P_INVID'
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_pay_invoice
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+  IF sy-subrc <> 0.
+
+    MESSAGE 'Invoice F4 help failed.' TYPE 'I'.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* RECEIPT INVOICE F4 HELP
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_recinv.
+
+  DATA: lt_rec_invoice TYPE TABLE OF yminvoice,
+        ls_rec_f4      TYPE yminvoice.
+
+  CLEAR lt_rec_invoice.
+
+  SELECT *
+    FROM yminvoice
+    INTO TABLE @lt_rec_invoice.
+
+  IF lt_rec_invoice IS INITIAL.
+
+    MESSAGE 'No invoices found.' TYPE 'I'.
+
+    RETURN.
+
+  ENDIF.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'INVOICE_ID'
+      dynpprog    = sy-repid
+      dynpnr      = sy-dynnr
+      dynprofield = 'P_REC_INV'
+      value_org   = 'S'
+    TABLES
+      value_tab   = lt_rec_invoice
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+  IF sy-subrc <> 0.
+
+    MESSAGE 'Invoice F4 help failed.' TYPE 'I'.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* BUTTON ACTIONS
+*---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN.
+
+  CASE sscrfields-ucomm.
+
+*---------------------------------------------------------------------*
+* UPDATE / PAYMENT SCREEN
+*---------------------------------------------------------------------*
+
+    WHEN 'UPDATE'.
+
+      CALL SELECTION-SCREEN 400
+        STARTING AT 20 5.
+
+*---------------------------------------------------------------------*
+* PAYMENT SAVE
+*---------------------------------------------------------------------*
+
+    WHEN 'PAYSAVE'.
+
+      DATA: ls_invoice TYPE yminvoice,
+            lv_new_paid TYPE p DECIMALS 2,
+            lv_balance  TYPE p DECIMALS 2,
+            lv_status   TYPE char20.
+
+*-------------------------------------------------------------------*
+* VALIDATE VENDOR
+*-------------------------------------------------------------------*
+
+      IF p_venpay IS INITIAL.
+
+        MESSAGE 'Please enter Vendor ID.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* VALIDATE INVOICE
+*-------------------------------------------------------------------*
+
+      IF p_invid IS INITIAL.
+
+        MESSAGE 'Please enter Invoice ID.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* VALIDATE PAYMENT
+*-------------------------------------------------------------------*
+
+      IF p_paid IS INITIAL OR p_paid <= 0.
+
+        MESSAGE 'Please enter a valid Paid Amount.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* GET INVOICE
+*-------------------------------------------------------------------*
+
+      CLEAR ls_invoice.
+
+      SELECT SINGLE *
+        FROM yminvoice
+        WHERE invoice_id = @p_invid
+          AND vendor_id  = @p_venpay
+        INTO @ls_invoice.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Invoice does not belong to selected Vendor.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* CALCULATE NEW PAID AMOUNT
+*-------------------------------------------------------------------*
+
+      lv_new_paid = ls_invoice-paid_amount + p_paid.
+
+*-------------------------------------------------------------------*
+* CALCULATE BALANCE
+*-------------------------------------------------------------------*
+
+      lv_balance = ls_invoice-amount - lv_new_paid.
+
+*-------------------------------------------------------------------*
+* PREVENT OVER PAYMENT
+*-------------------------------------------------------------------*
+
+      IF lv_balance < 0.
+
+        MESSAGE 'Payment is greater than remaining balance.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* STATUS
+*-------------------------------------------------------------------*
+
+      IF lv_balance = 0.
+
+        lv_status = 'PAID'.
+
+      ELSE.
+
+        lv_status = 'PENDING'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* UPDATE INVOICE
+*-------------------------------------------------------------------*
+
+      UPDATE yminvoice
+         SET paid_amount = @lv_new_paid,
+             balance     = @lv_balance,
+             status      = @lv_status
+       WHERE invoice_id = @p_invid
+         AND vendor_id  = @p_venpay.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Payment update failed.' TYPE 'E'.
+
+      ENDIF.
+
+*-------------------------------------------------------------------*
+* SAVE
+*-------------------------------------------------------------------*
+
+      COMMIT WORK.
+
+*-------------------------------------------------------------------*
+* SUCCESS MESSAGE
+*-------------------------------------------------------------------*
+
+      MESSAGE |Payment successful! Paid: { p_paid DECIMALS = 2 }, |
+              && |Remaining Balance: { lv_balance DECIMALS = 2 }, |
+              && |Status: Partially paid|
+              TYPE 'S'.
+
+*---------------------------------------------------------------------*
+* OPEN VENDOR
+*---------------------------------------------------------------------*
+
+    WHEN 'VENDOR'.
+
+      CALL SELECTION-SCREEN 200
+        STARTING AT 20 5.
+
+*---------------------------------------------------------------------*
+* SAVE VENDOR
+*---------------------------------------------------------------------*
+
+    WHEN 'SAVT'.
+
+      IF p_vname IS INITIAL.
+
+        MESSAGE 'Please enter Vendor Name' TYPE 'E'.
+
+      ELSEIF p_city IS INITIAL.
+
+        MESSAGE 'Please enter City' TYPE 'E'.
+
+      ELSEIF p_phone IS INITIAL.
+
+        MESSAGE 'Please enter Phone Number' TYPE 'E'.
+
+      ELSEIF p_email IS INITIAL.
+
+        MESSAGE 'Please enter Email' TYPE 'E'.
+
+      ELSE.
+
+*---------------------------------------------------------------------*
+* FILL VENDOR
+*---------------------------------------------------------------------*
+
+        CLEAR wa_vendor.
+
+        wa_vendor-vendor_id   = p_vid.
+        wa_vendor-vendor_name = p_vname.
+        wa_vendor-city_name   = p_city.
+        wa_vendor-phone_num   = p_phone.
+        wa_vendor-email_id    = p_email.
+        wa_vendor-ven_status  = 'ACTIVE'.
+        wa_vendor-created_on  = sy-datum.
+
+*---------------------------------------------------------------------*
+* INSERT VENDOR
+*---------------------------------------------------------------------*
+
+        INSERT ymvendor FROM wa_vendor.
+
+        IF sy-subrc = 0.
+
+          COMMIT WORK.
+
+          MESSAGE |Vendor { lv_new_id } saved successfully|
+                  TYPE 'S'.
+
+          CLEAR:
+            p_vname,
+            p_city,
+            p_phone,
+            p_email.
+
+        ELSE.
+
+          ROLLBACK WORK.
+
+          MESSAGE 'Error while saving vendor' TYPE 'E'.
+
+        ENDIF.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* SAVE INVOICE
+*---------------------------------------------------------------------*
+
+    WHEN 'INVSAVE'.
+
+      IF p_venid IS INITIAL.
+
+        MESSAGE 'Please enter Vendor ID' TYPE 'E'.
+
+      ELSEIF p_ddate IS INITIAL.
+
+        MESSAGE 'Please enter Due Date' TYPE 'E'.
+
+      ELSEIF p_amount IS INITIAL OR p_amount <= 0.
+
+        MESSAGE 'Please enter valid Invoice Amount' TYPE 'E'.
+
+      ELSE.
+
+*---------------------------------------------------------------------*
+* CHECK VENDOR
+*---------------------------------------------------------------------*
+
+        SELECT SINGLE vendor_id
+          INTO @DATA(lv_vendor_check)
+          FROM ymvendor
+          WHERE vendor_id = @p_venid.
+
+        IF sy-subrc <> 0.
+
+          MESSAGE 'Vendor ID does not exist' TYPE 'E'.
+
+        ELSE.
+
+*---------------------------------------------------------------------*
+* GENERATE INVOICE ID
+*---------------------------------------------------------------------*
+
+          SELECT COUNT( * )
+            INTO lv_invoice_count
+            FROM yminvoice.
+
+          lv_inv_num = lv_invoice_count + 1.
+
+          lv_new_inv_id =
+            |INV{ lv_inv_num WIDTH = 4 PAD = '0' }|.
+
+*---------------------------------------------------------------------*
+* FILL INVOICE
+*---------------------------------------------------------------------*
+
+          CLEAR wa_invoice.
+
+          wa_invoice-invoice_id   = lv_new_inv_id.
+          wa_invoice-vendor_id    = p_venid.
+          wa_invoice-invoice_date = sy-datum.
+          wa_invoice-due_date     = p_ddate.
+          wa_invoice-amount       = p_amount.
+          wa_invoice-paid_amount  = 0.
+          wa_invoice-balance      = p_amount.
+          wa_invoice-status       = 'PENDING'.
+          wa_invoice-created_by   = sy-uname.
+
+*---------------------------------------------------------------------*
+* INSERT INVOICE
+*---------------------------------------------------------------------*
+
+          INSERT yminvoice FROM wa_invoice.
+
+          IF sy-subrc = 0.
+
+            COMMIT WORK.
+
+            MESSAGE |Invoice { lv_new_inv_id } saved successfully|
+                    TYPE 'S'.
+
+            CLEAR:
+              p_venid,
+              p_ddate,
+              p_amount.
+
+          ELSE.
+
+            ROLLBACK WORK.
+
+            MESSAGE 'Error while saving invoice' TYPE 'E'.
+
+          ENDIF.
+
+        ENDIF.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* OPEN INVOICE ENTRY
+*---------------------------------------------------------------------*
+
+    WHEN 'INVOICE'.
+
+      CALL SELECTION-SCREEN 300
+           STARTING AT 10 5
+           ENDING AT 80 15.
+
+*---------------------------------------------------------------------*
+* PENDING INVOICES
+*---------------------------------------------------------------------*
+
+    WHEN 'PENDING'.
+
+      DATA: lt_pending TYPE TABLE OF yminvoice,
+            ls_pending TYPE yminvoice.
+
+      DATA: lt_fieldcat TYPE slis_t_fieldcat_alv,
+            ls_fieldcat TYPE slis_fieldcat_alv.
+
+      DATA: ls_layout TYPE slis_layout_alv.
+
+      DATA: ls_print TYPE slis_print_alv.
+
+*---------------------------------------------------------------------*
+* GET PENDING INVOICES
+*---------------------------------------------------------------------*
+
+      SELECT *
+        FROM yminvoice
+        INTO TABLE @lt_pending
+        WHERE status = 'PENDING'.
+
+*---------------------------------------------------------------------*
+* CHECK DATA
+*---------------------------------------------------------------------*
+
+      IF lt_pending IS INITIAL.
+
+        MESSAGE 'No pending invoices found' TYPE 'I'.
+
+      ELSE.
+
+*---------------------------------------------------------------------*
+* FIELD CATALOG
+*---------------------------------------------------------------------*
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'INVOICE_ID'.
+        ls_fieldcat-seltext_m = 'Invoice ID'.
+        ls_fieldcat-col_pos   = 1.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'VENDOR_ID'.
+        ls_fieldcat-seltext_m = 'Vendor ID'.
+        ls_fieldcat-col_pos   = 2.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'INVOICE_DATE'.
+        ls_fieldcat-seltext_m = 'Invoice Date'.
+        ls_fieldcat-col_pos   = 3.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'DUE_DATE'.
+        ls_fieldcat-seltext_m = 'Due Date'.
+        ls_fieldcat-col_pos   = 4.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'AMOUNT'.
+        ls_fieldcat-seltext_m = 'Amount'.
+        ls_fieldcat-col_pos   = 5.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'PAID_AMOUNT'.
+        ls_fieldcat-seltext_m = 'Paid Amount'.
+        ls_fieldcat-col_pos   = 6.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'BALANCE'.
+        ls_fieldcat-seltext_m = 'Balance'.
+        ls_fieldcat-col_pos   = 7.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CLEAR ls_fieldcat.
+
+        ls_fieldcat-fieldname = 'STATUS'.
+        ls_fieldcat-seltext_m = 'Status'.
+        ls_fieldcat-col_pos   = 8.
+        APPEND ls_fieldcat TO lt_fieldcat.
+
+        CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+          EXPORTING
+            i_callback_program = sy-repid
+            it_fieldcat        = lt_fieldcat
+            I_GRID_TITLE       = 'PENDING INVOICE'
+          TABLES
+            t_outtab           = lt_pending
+          EXCEPTIONS
+            program_error      = 1
+            OTHERS             = 2.
+
+        IF sy-subrc <> 0.
+
+        ENDIF.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* PAID INVOICES
+*---------------------------------------------------------------------*
+
+    WHEN 'PAID'.
+
+      DATA: lt_paid TYPE TABLE OF yminvoice,
+            ls_paid TYPE yminvoice.
+
+*---------------------------------------------------------------------*
+* GET PAID INVOICES
+*---------------------------------------------------------------------*
+
+      SELECT *
+        FROM yminvoice
+        INTO TABLE @lt_paid
+        WHERE status = 'PAID'.
+
+*---------------------------------------------------------------------*
+* CHECK DATA
+*---------------------------------------------------------------------*
+
+      IF lt_paid IS INITIAL.
+
+        MESSAGE 'No paid invoices found' TYPE 'I'.
+
+      ELSE.
+
+        CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+          EXPORTING
+            i_callback_program = sy-repid
+            i_structure_name   = 'YMINVOICE'
+            it_fieldcat        = lt_fieldcat
+            I_GRID_TITLE       = 'PAID INVOICE'
+          TABLES
+            t_outtab           = lt_paid
+          EXCEPTIONS
+            program_error      = 1
+            OTHERS             = 2.
+
+        IF sy-subrc <> 0.
+
+        ENDIF.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* VENDOR-WISE SUMMARY
+*---------------------------------------------------------------------*
+
+    WHEN 'SUMMARY'.
+
+      DATA it_ven TYPE TABLE OF ymvendor.
+
+      IF s_venid IS INITIAL.
+
+        SELECT *
+          FROM ymvendor
+          INTO TABLE it_ven.
+
+      ELSE.
+
+        SELECT *
+          FROM ymvendor
+          INTO TABLE it_ven
+          WHERE vendor_id IN s_venid.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* CHECK DATA
+*---------------------------------------------------------------------*
+
+      IF it_ven IS INITIAL.
+
+        MESSAGE 'No vendor number found' TYPE 'I'.
+
+      ELSE.
+
+        CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+          EXPORTING
+            i_callback_program   = sy-repid
+            i_callback_user_command = 'DISP'
+            i_structure_name     = 'YMVENDOR'
+            I_GRID_TITLE       = 'VENDERS SUMMARY'
+          TABLES
+            t_outtab             = it_ven
+          EXCEPTIONS
+            program_error        = 1
+            OTHERS               = 2.
+
+        IF sy-subrc <> 0.
+
+        ENDIF.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* RECEIPT
+*---------------------------------------------------------------------*
+
+    WHEN 'RECEIPT'.
+
+      CALL SELECTION-SCREEN 500
+           STARTING AT 20 5
+           ENDING AT 70 12.
+
+*---------------------------------------------------------------------*
+* PRINT PAYMENT RECEIPT
+*---------------------------------------------------------------------*
+
+    WHEN 'RECPRINT'.
+
+      DATA: ls_rec_invoice TYPE yminvoice,
+            ls_rec_vendor  TYPE ymvendor,
+            lv_smart_fm    TYPE rs38l_fnam.
+
+*---------------------------------------------------------------------*
+* VALIDATE INVOICE ID
+*---------------------------------------------------------------------*
+
+      IF p_recinv IS INITIAL.
+
+        MESSAGE 'Please enter Invoice ID.' TYPE 'E'.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* GET INVOICE DETAILS
+*---------------------------------------------------------------------*
+
+      CLEAR ls_rec_invoice.
+
+      SELECT SINGLE *
+        FROM yminvoice
+        WHERE invoice_id = @p_recinv
+        INTO @ls_rec_invoice.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Invoice ID does not exist.' TYPE 'E'.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* GET VENDOR DETAILS
+*---------------------------------------------------------------------*
+
+      CLEAR ls_rec_vendor.
+
+      SELECT SINGLE *
+        FROM ymvendor
+        WHERE vendor_id = @ls_rec_invoice-vendor_id
+        INTO @ls_rec_vendor.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Vendor details not found.' TYPE 'E'.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* GET SMART FORM FUNCTION MODULE
+*---------------------------------------------------------------------*
+
+      CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+        EXPORTING
+          formname           = 'ZYM_PAYMENT_RECEIPT'
+        IMPORTING
+          fm_name            = lv_smart_fm
+        EXCEPTIONS
+          no_form            = 1
+          no_function_module = 2
+          OTHERS             = 3.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Unable to find Smart Form function module.' TYPE 'E'.
+
+      ENDIF.
+
+*---------------------------------------------------------------------*
+* CALL SMART FORM
+*---------------------------------------------------------------------*
+
+      CALL FUNCTION lv_smart_fm
+        EXPORTING
+          is_vendor  = ls_rec_vendor
+          is_invoice = ls_rec_invoice
+        EXCEPTIONS
+          formatting_error = 1
+          internal_error   = 2
+          send_error       = 3
+          user_canceled    = 4
+          OTHERS           = 5.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE 'Error while printing payment receipt.' TYPE 'E'.
+
+      ELSE.
+
+        MESSAGE |Payment receipt generated for Invoice { p_recinv }|
+                TYPE 'S'.
+
+        CLEAR p_recinv.
+
+      ENDIF.
+
+  ENDCASE.
+
+
+*---------------------------------------------------------------------*
+* FORM DISP
+*---------------------------------------------------------------------*
+
+FORM DISP USING r_ucomm LIKE sy-ucomm
+                rs_selfield TYPE slis_selfield.
+
+  CASE r_ucomm.
+
+    WHEN '&IC1'.
+
+      IF rs_selfield-fieldname = 'VENDOR_ID'.
+
+        DATA: it_invoice  TYPE TABLE OF yminvoice,
+              wa_invoice  TYPE yminvoice,
+              it_fieldcat TYPE slis_t_fieldcat_alv,
+              wa_fieldcat TYPE slis_fieldcat_alv.
+
+*---------------------------------------------------------------------*
+* GET INVOICES FOR SELECTED VENDOR
+*---------------------------------------------------------------------*
+
+        SELECT *
+          FROM yminvoice
+          INTO TABLE @it_invoice
+          WHERE vendor_id = @rs_selfield-value.
+
+        IF it_invoice IS INITIAL.
+
+          MESSAGE 'No invoices found for this vendor' TYPE 'I'.
+
+        ELSE.
+
+*---------------------------------------------------------------------*
+* CALCULATE BALANCE AND STATUS
+*---------------------------------------------------------------------*
+
+          LOOP AT it_invoice INTO wa_invoice.
+
+            wa_invoice-balance =
+              wa_invoice-amount - wa_invoice-paid_amount.
+
+            IF wa_invoice-balance = 0.
+
+              wa_invoice-status = 'PAID'.
+
+            ELSE.
+
+              wa_invoice-status = 'PENDING'.
+
+            ENDIF.
+
+            MODIFY it_invoice FROM wa_invoice.
+
+          ENDLOOP.
+
+*---------------------------------------------------------------------*
+* AUTOMATICALLY CREATE FIELD CATALOG
+*---------------------------------------------------------------------*
+
+          CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+            EXPORTING
+              i_structure_name = 'YMINVOICE'
+            CHANGING
+              ct_fieldcat      = it_fieldcat
+            EXCEPTIONS
+              inconsistent_interface = 1
+              program_error          = 2
+              OTHERS                 = 3.
+
+          IF sy-subrc <> 0.
+
+            MESSAGE 'Error creating ALV field catalog' TYPE 'E'.
+
+          ENDIF.
+
+*---------------------------------------------------------------------*
+* HIDE CREATED_ON
+*---------------------------------------------------------------------*
+
+          LOOP AT it_fieldcat INTO wa_fieldcat.
+
+            IF wa_fieldcat-fieldname = 'CREATED_ON'.
+
+              wa_fieldcat-no_out = 'X'.
+
+              MODIFY it_fieldcat FROM wa_fieldcat.
+
+            ENDIF.
+
+          ENDLOOP.
+
+*---------------------------------------------------------------------*
+* DISPLAY INVOICE ALV
+*---------------------------------------------------------------------*
+
+          CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+            EXPORTING
+              i_callback_program = sy-repid
+              i_structure_name   = 'YMINVOICE'
+              i_grid_title       = 'Vendor Invoice Details'
+              i_default          = 'X'
+              i_save             = 'A'
+              it_fieldcat        = it_fieldcat
+            TABLES
+              t_outtab           = it_invoice
+            EXCEPTIONS
+              program_error      = 1
+              OTHERS             = 2.
+
+          IF sy-subrc <> 0.
+
+            MESSAGE 'Error while displaying invoice ALV' TYPE 'E'.
+
+          ENDIF.
+
+        ENDIF.
+
+      ENDIF.
+
+  ENDCASE.
+
+ENDFORM.

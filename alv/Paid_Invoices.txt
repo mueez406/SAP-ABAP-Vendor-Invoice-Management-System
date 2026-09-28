@@ -1,0 +1,63 @@
+PAID INVOICES ALV
+=================
+
+Purpose
+-------
+
+The Paid Invoices report displays invoices whose current status
+is PAID.
+
+Data Source
+-----------
+
+Table: YMINVOICE
+
+Selection Condition
+-------------------
+
+The program selects invoices where:
+
+STATUS = 'PAID'
+
+
+ALV Display
+-----------
+
+The report uses:
+
+REUSE_ALV_GRID_DISPLAY
+
+The ALV displays invoice information from the YMINVOICE table,
+including the invoice details and payment information.
+
+
+Report Title
+------------
+
+PAID INVOICE
+
+
+Business Logic
+--------------
+
+When the complete invoice amount has been paid:
+
+Balance = 0
+
+The program sets:
+
+STATUS = 'PAID'
+
+The invoice is then displayed in the Paid Invoices report.
+
+
+Purpose for End Users
+---------------------
+
+This report allows users to:
+
+1. View invoices that have been completely paid.
+2. Check the invoice amount.
+3. Check the total paid amount.
+4. Check the remaining balance.
+5. Verify the payment status.

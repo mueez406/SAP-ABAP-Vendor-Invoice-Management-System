@@ -1,0 +1,80 @@
+Receipt Layout:
+------------------------------------------------------------
+
+1. Main Heading
+   VENDOR INVOICE MANAGEMENT
+   PAYMENT RECEIPT
+
+2. Receipt Information
+   Receipt Number
+   Receipt Date
+
+3. Vendor Details
+   Vendor ID
+   Vendor Name
+   City
+   Phone Number
+   Email ID
+
+4. Invoice Information
+   Invoice ID
+   Invoice Date
+   Due Date
+
+5. Payment Details
+   Invoice Amount
+   Paid Amount
+   Balance
+   Payment Status
+
+6. Footer
+   Thank You!
+
+
+------------------------------------------------------------
+
+Dynamic Fields:
+
+All receipt values are retrieved dynamically from the
+IS_VENDOR and IS_INVOICE structures.
+
+Example Smart Form Field Symbols:
+
+&IS_VENDOR-VENDOR_ID&
+&IS_VENDOR-VENDOR_NAME&
+&IS_VENDOR-CITY_NAME&
+&IS_VENDOR-PHONE_NUM&
+&IS_VENDOR-EMAIL_ID&
+
+&IS_INVOICE-INVOICE_ID&
+&IS_INVOICE-VENDOR_ID&
+&IS_INVOICE-INVOICE_DATE&
+&IS_INVOICE-DUE_DATE&
+&IS_INVOICE-AMOUNT&
+&IS_INVOICE-PAID_AMOUNT&
+&IS_INVOICE-BALANCE&
+&IS_INVOICE-STATUS&
+&IS_INVOICE-CREATED_BY&
+
+
+------------------------------------------------------------
+
+Integration:
+
+The Smart Form is connected to the RECEIPT section/button
+of the main ABAP report YMINVOICE_M.
+
+The user enters an Invoice ID and selects the PRINT button.
+
+The program retrieves the invoice details from YMINVOICE
+and the related vendor details from YMVENDOR.
+
+The Smart Form used by the project is:
+
+ZYM_PAYMENT_RECEIPT
+
+
+------------------------------------------------------------
+Project:
+SAP ABAP VENDOR INVOICE MANAGEMENT SYSTEM
+------------------------------------------------------------

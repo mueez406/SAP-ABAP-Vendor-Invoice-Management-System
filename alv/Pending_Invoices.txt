@@ -1,0 +1,69 @@
+PENDING INVOICES ALV
+====================
+
+Purpose
+-------
+
+The Pending Invoices report displays invoices whose current status
+is PENDING.
+
+Data Source
+-----------
+
+Table: YMINVOICE
+
+Selection Condition
+-------------------
+
+The program selects invoices where:
+
+STATUS = 'PENDING'
+
+
+ALV Display
+-----------
+
+The report uses:
+
+REUSE_ALV_GRID_DISPLAY
+
+The ALV displays the following invoice information:
+
+- Invoice ID
+- Vendor ID
+- Invoice Date
+- Due Date
+- Amount
+- Paid Amount
+- Balance
+- Status
+
+
+Report Title
+------------
+
+PENDING INVOICE
+
+
+Business Logic
+--------------
+
+An invoice remains PENDING when its remaining balance is greater
+than zero.
+
+When the complete invoice amount is paid, the invoice status is
+changed to PAID and it will no longer appear in the Pending
+Invoices report.
+
+
+Purpose for End Users
+---------------------
+
+This report allows users to:
+
+1. View all currently pending invoices.
+2. Check the invoice amount.
+3. Check the amount already paid.
+4. Check the remaining balance.
+5. Check the invoice due date.
+6. Identify invoices that still require payment.

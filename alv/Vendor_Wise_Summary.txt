@@ -1,0 +1,85 @@
+VENDOR-WISE SUMMARY
+===================
+
+Purpose
+-------
+
+The Vendor-wise Summary displays vendor master information and
+allows the user to view the invoices belonging to a selected
+vendor.
+
+Data Source
+-----------
+
+Table: YMVENDOR
+
+
+Vendor Selection
+----------------
+
+The program can display:
+
+1. All vendors
+2. Vendors filtered using the Vendor ID selection
+
+The report uses the Vendor ID selection to filter vendors when
+a value is provided.
+
+
+ALV Display
+-----------
+
+The report uses:
+
+REUSE_ALV_GRID_DISPLAY
+
+The ALV displays vendor information from the YMVENDOR table.
+
+
+Report Title
+------------
+
+VENDERS SUMMARY
+
+
+Interactive Function
+--------------------
+
+The Vendor ID in the ALV is interactive.
+
+When the user double-clicks a Vendor ID:
+
+1. The program identifies the selected Vendor ID.
+2. It retrieves all invoices belonging to that vendor from
+   YMINVOICE.
+3. The invoice balance is calculated.
+4. The invoice status is determined.
+5. A second ALV is displayed with the vendor's invoice details.
+
+
+Invoice Balance Logic
+---------------------
+
+Balance = Invoice Amount - Paid Amount
+
+If Balance = 0:
+
+STATUS = PAID
+
+Otherwise:
+
+STATUS = PENDING
+
+
+Purpose for End Users
+---------------------
+
+This report allows users to:
+
+1. View vendor information.
+2. Filter vendors by Vendor ID.
+3. Double-click a Vendor ID.
+4. View all invoices belonging to that vendor.
+5. Check invoice amount and payment information.
+6. Check the current invoice balance.
+7. Check whether each invoice is PENDING or PAID.

@@ -1,0 +1,54 @@
+# YMVENDOR
+
+## Purpose
+
+YMVENDOR stores the vendor master information used by the
+Vendor Invoice Management System.
+
+## Vendor Information
+
+The vendor details used by the ABAP program include:
+
+- Vendor ID
+- Vendor Name
+- City
+- Phone Number
+- Email ID
+- Vendor Status
+- Created Date
+
+## Fields Used in the ABAP Program
+
+| Field | Description |
+|---|---|
+| VENDOR_ID | Unique identifier of the vendor |
+| VENDOR_NAME | Name of the vendor |
+| CITY_NAME | Vendor city |
+| PHONE_NUM | Vendor phone number |
+| EMAIL_ID | Vendor email address |
+| VEN_STATUS | Vendor status |
+| CREATED_ON | Vendor creation date |
+
+## Default Values
+
+When a vendor is created:
+
+- VEN_STATUS is set to `ACTIVE`
+- CREATED_ON is set using `SY-DATUM`
+
+## Usage in the Project
+
+YMVENDOR is used for:
+
+1. Creating vendor details
+2. Validating vendors while creating invoices
+3. Vendor F4 help
+4. Vendor-wise summary ALV
+5. Retrieving vendor details for the payment receipt
+
+## Related Table
+
+`YMINVOICE`
+
+YMINVOICE stores invoice details associated with the
+vendor through `VENDOR_ID`.
